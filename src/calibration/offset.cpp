@@ -1,4 +1,4 @@
-#if 1
+#if 0 /* FILE */
 
 #include <Arduino.h>
 
@@ -24,6 +24,88 @@ void IRAM_ATTR ISR_FIFO_OVF() {
 	digitalWrite(LED, LED_ON);
 }
 
+#if 0 /* GET OFFSET*/
+
+void setup() {
+    Serial.begin(115200);
+
+    Wire.begin();
+    Wire.setClock(400000);
+
+    /* MPU9250 INIT */ {
+        my_assert(mpu.testConnection(), "mpu connection failed! (%d)", (int)mpu.getDeviceID());
+        mpu.reset();
+        mpu.initialize();
+
+        Serial.println("accel");
+        Serial.printf("%10hd", mpu.getXAccelOffset());
+        Serial.printf("%10hd", mpu.getYAccelOffset());
+        Serial.printf("%10hd", mpu.getZAccelOffset());
+        Serial.println();
+        Serial.println("gyro");
+        Serial.printf("%10hd", mpu.getXGyroOffset());
+        Serial.printf("%10hd", mpu.getYGyroOffset());
+        Serial.printf("%10hd", mpu.getZGyroOffset());
+        Serial.println();
+        Serial.println("gyro user");
+        Serial.printf("%10hd", mpu.getXGyroOffsetUser());
+        Serial.printf("%10hd", mpu.getYGyroOffsetUser());
+        Serial.printf("%10hd", mpu.getZGyroOffsetUser());
+        Serial.println();
+    }
+}
+
+void loop() { }
+
+#endif /* GET OFFSET*/
+
+#if 0 /* ACCEL */
+
+void setup() {
+    Serial.begin(115200);
+
+    Wire.begin();
+    Wire.setClock(400000);
+
+    digitalWrite(LED, LED_OFF);
+    pinMode(LED, OUTPUT);
+
+    /* MPU9250 INIT */ {
+        my_assert(mpu.testConnection(), "mpu connection failed! (%d)", (int)mpu.getDeviceID());
+        mpu.reset();
+        mpu.initialize();
+
+        /* DLPF */
+        // mpu.setDLPFMode(6);
+        // mpu.setAccelDLPFMode(6);
+
+        /* OFFSET
+         * 현재 설정된 full scale이 어떻든 offset은 16G 기준이다.
+         * 상위 15bit가 사용되며, LSB는 예약되어 있다.
+         * my 센서는 기존 값이 (5622, 3472, 9986)이다.
+         */
+        mpu.setXAccelOffset(mpu.getXAccelOffset() + 0);
+        mpu.setYAccelOffset(mpu.getYAccelOffset() + 0);
+        mpu.setZAccelOffset(mpu.getZAccelOffset() + -2048);
+    }
+
+    // Serial.println("ax ay az");
+}
+
+void loop() {
+    int16_t ax, ay, az;
+    mpu.getAcceleration(&ax, &ay, &az);
+
+    Serial.print(ax); Serial.print(' ');
+    Serial.print(ay); Serial.print(' ');
+    Serial.print(az); Serial.print(' ');
+    Serial.println();
+}
+
+#endif /* ACCEL */
+
+#if 1 /* GYRO */
+
 void setup() {
     Serial.begin(115200);
 
@@ -42,58 +124,32 @@ void setup() {
         mpu.setDLPFMode(6);
         mpu.setAccelDLPFMode(6);
 
-        /* INT */
-        mpu.setIntFIFOBufferOverflowEnabled(true);
-        mpu.setInterruptLatch(true);
-
         /* OFFSET
-         * 현재 설정된 full scale이 어떻든 offset은 16G 기준이다.
-         * 따라서 15bit기준, 각 스텝당 0.9765625mG이다(LSB는 reserved).
-         * 마이 센서는 기존 값이 (5622, 3472, 9986)이다.
+         * my 센서는 기존 값이 (32, 42, 48)이다.
+         * user데이터 기존 값은 (0, 0, 0)이다.
          */
-        mpu.setXAccelOffset(mpu.getXAccelOffset() + 0);
-        mpu.setYAccelOffset(mpu.getYAccelOffset() + 0);
-        mpu.setZAccelOffset(mpu.getZAccelOffset() + -2048);
+        // mpu.setXGyroOffset(mpu.getXGyroOffset() + 32);
+        // mpu.setYGyroOffset(mpu.getYGyroOffset() + 0);
+        // mpu.setZGyroOffset(mpu.getZGyroOffset() + 0);
 
-        /* FIFO */
-        mpu.resetFIFO();
-        mpu.setFIFOMode(true);
-        mpu.setFIFOEnabled(true);
-
-        #define FIFO_DATA_SIZE (3 * 2)
-        mpu.setAccelFIFOEnabled(true);
-        // mpu.setXGyroFIFOEnabled(true);
-        // mpu.setYGyroFIFOEnabled(true);
-        // mpu.setXGyroFIFOEnabled(true);
+        mpu.setXGyroOffsetUser(mpu.getXGyroOffsetUser() + 100);
+        mpu.setYGyroOffsetUser(mpu.getYGyroOffsetUser());
+        mpu.setZGyroOffsetUser(mpu.getZGyroOffsetUser());
     }
 
-    pinMode(MPU_INT, INPUT);
-    attachInterrupt(MPU_INT, ISR_FIFO_OVF, RISING);
-
-    // Serial.println("ax ay az gx gy gz");
+    // Serial.println("gx gy gz");
 }
 
 void loop() {
-    static uint16_t fifo_cnt;
+    int16_t gx, gy, gz;
+    mpu.getRotation(&gx, &gy, &gz);
 
-    if (fifo_cnt < FIFO_DATA_SIZE) {
-        if ((fifo_cnt = mpu.getFIFOCount()) < FIFO_DATA_SIZE) {
-            return;
-        }
-    }
-
-    fifo_cnt -= FIFO_DATA_SIZE;
-
-    uint8_t buf[FIFO_DATA_SIZE];
-    mpu.getFIFOBytes(buf, FIFO_DATA_SIZE);
-
-    for (uint8_t j = 0; j < FIFO_DATA_SIZE; j += 2) {
-        uint16_t data = (buf[j] << 8) | buf[j + 1];
-        Serial.printf("%10hd", data);
-    }
+    Serial.print(gx); Serial.print(' ');
+    Serial.print(gy); Serial.print(' ');
+    Serial.print(gz); Serial.print(' ');
     Serial.println();
-
-    // delay(100);
 }
 
-#endif
+#endif /* GYRO */
+
+#endif /* FILE */

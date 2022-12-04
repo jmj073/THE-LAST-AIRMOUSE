@@ -29,6 +29,7 @@ void setup() {
     pinMode(LED, OUTPUT);
 
     pinMode(MPU_INT, INPUT);
+    // attachInterrupt(MPU_INT, ISR, RISING);
 
     my_assert(mpu.testConnection(), "mpu connection failed! (%d)", (int)mpu.getDeviceID());
     mpu.reset();

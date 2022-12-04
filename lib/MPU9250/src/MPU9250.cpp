@@ -136,13 +136,25 @@ void MPU9250::setRate(uint8_t rate) {
 
 // CONFIG register
 
+/** Overwrite FIFO or not overwrite
+ * When set to ‘1’, when the fifo is full, additional writes will not be written to fifo.
+ * When set to ‘0’, when the fifo is full, additional writes will be written to the fifo,
+ * replacing the oldest data.
+ * @return (0=OVERWRITE, 1=NOT OVERWRITE)
+ */
 bool MPU9250::getFIFOMode() {
     I2Cdev::readBit(devAddr, MPU9250_RA_CONFIG, MPU9250_CFG_FIFO_MODE, buffer);
     return buffer[0];
 }
 
-void MPU9250::setFIFOMode(bool enabled) {
-    I2Cdev::writeBit(devAddr, MPU9250_RA_CONFIG, MPU9250_CFG_FIFO_MODE, enabled);
+/** Overwrite FIFO or not overwrite
+ * When set to ‘1’, when the fifo is full, additional writes will not be written to fifo.
+ * When set to ‘0’, when the fifo is full, additional writes will be written to the fifo,
+ * replacing the oldest data.
+ * @param mode (0=OVERWRITE, 1=NOT OVERWRITE)
+ */
+void MPU9250::setFIFOMode(bool mode) {
+    I2Cdev::writeBit(devAddr, MPU9250_RA_CONFIG, MPU9250_CFG_FIFO_MODE, mode);
 }
 
 /** Get external FSYNC configuration.

@@ -438,7 +438,7 @@ class MPU9250 {
 
         // CONFIG register
         bool getFIFOMode();
-        void setFIFOMode(bool enabled);
+        void setFIFOMode(bool mode);
         uint8_t getExternalFrameSync();
         void setExternalFrameSync(uint8_t sync);
         uint8_t getDLPFMode();
