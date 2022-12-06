@@ -22,7 +22,7 @@ static MPU9250 mpu;
 constexpr uint8_t GY_FS_SEL = MPU9250_GYRO_FS_250;
 constexpr uint8_t AC_FS_SEL = MPU9250_ACCEL_FS_2;
 
-constexpr float COMPLE_A = 0.96;
+constexpr float COMPLE_ALPHA = 0.96;
 
 void setup() {
     Serial.begin(115200);
@@ -80,21 +80,24 @@ void loop() {
 
     int16_t ax, ay, az;
     mpu.getAcceleration(&ax, &ay, &az);
-    aroll = accel_raw2roll(ax, ay, az);
-    apitch = accel_raw2pitch(ax, ay, az);
+    aroll   = accel_raw2roll(ax, ay, az);
+    apitch  = accel_raw2pitch(ax, ay, az);
 
     int16_t gx, gy, gz;
     mpu.getRotation(&gx, &gy, &gz);
     uint32_t curr_us = micros();
     uint32_t diff_us = curr_us - prev_us;
-    groll   = gyro_raw2degree(gx, diff_us);
-    gpitch  = gyro_raw2degree(gy, diff_us);
+    groll   = gyro_raw2degree(gx, diff_us) * (az >= 0 ? 1 : -1);
+    gpitch  = gyro_raw2degree(gy, diff_us) * (az >= 0 ? 1 : -1);
     gyaw    = gyro_raw2degree(gz, diff_us);
     prev_us = curr_us;
 
-    roll    = COMPLE_A * (roll + groll) + (1 - COMPLE_A) * aroll;
-    pitch   = COMPLE_A * (pitch + gpitch) + (1 - COMPLE_A) * apitch;
+    roll    = COMPLE_ALPHA * (roll + groll) + (1 - COMPLE_ALPHA) * aroll;
+    pitch   = COMPLE_ALPHA * (pitch + gpitch) + (1 - COMPLE_ALPHA) * apitch;
     yaw     = (yaw + gyaw);
+    // roll += groll;
+    // pitch += gpitch;
+    // yaw += gyaw;
 
     Serial.print(roll); Serial.print(' ');
     Serial.print(pitch); Serial.print(' ');

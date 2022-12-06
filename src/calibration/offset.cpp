@@ -59,7 +59,7 @@ void loop() { }
 
 #endif /* GET OFFSET*/
 
-#if 0 /* ACCEL */
+#if 1 /* ACCEL */
 
 void setup() {
     Serial.begin(115200);
@@ -116,27 +116,27 @@ void mean_sensors(int16_t* gx, int16_t* gy, int16_t* gz, size_t n) {
     *gz = acc_z / (int32_t)n;
 }
 
-void loop() {
-    delay(200);
-
-    int16_t x, y, z;
-    mean_sensors(&x, &y, &z, 1000);
-
-    Serial.printf("%10hd", x);
-    Serial.printf("%10hd", y);
-    Serial.printf("%10hd", z);
-    Serial.println();
-}
-
 // void loop() {
-//     int16_t ax, ay, az;
-//     mpu.getAcceleration(&ax, &ay, &az);
+//     delay(200);
 
-//     Serial.print(ax); Serial.print(' ');
-//     Serial.print(ay); Serial.print(' ');
-//     Serial.print(az); Serial.print(' ');
+//     int16_t x, y, z;
+//     mean_sensors(&x, &y, &z, 1000);
+
+//     Serial.printf("%10hd", x);
+//     Serial.printf("%10hd", y);
+//     Serial.printf("%10hd", z);
 //     Serial.println();
 // }
+
+void loop() {
+    int16_t ax, ay, az;
+    mpu.getAcceleration(&ax, &ay, &az);
+
+    Serial.print(ax); Serial.print(' ');
+    Serial.print(ay); Serial.print(' ');
+    Serial.print(az); Serial.print(' ');
+    Serial.println();
+}
 
 #endif /* ACCEL */
 
