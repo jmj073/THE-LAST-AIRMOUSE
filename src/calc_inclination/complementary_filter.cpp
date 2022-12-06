@@ -1,4 +1,4 @@
-#if 0 /* FILE */
+#if 1 /* FILE */
 /* accel raw data to degree(roll, pitch, yaw) */
 
 #include <Arduino.h>
@@ -22,6 +22,8 @@ static MPU9250 mpu;
 constexpr uint8_t GY_FS_SEL = MPU9250_GYRO_FS_250;
 constexpr uint8_t AC_FS_SEL = MPU9250_ACCEL_FS_2;
 
+constexpr float COMPLE_A = 0.96;
+
 void setup() {
     Serial.begin(115200);
 
@@ -39,6 +41,9 @@ void setup() {
         mpu.setFullScaleGyroRange(GY_FS_SEL);
         mpu.setFullScaleAccelRange(AC_FS_SEL);
 
+        mpu.setXGyroOffsetUser(54);
+        mpu.setYGyroOffsetUser(32);
+        mpu.setZGyroOffsetUser(32);
 
         mpu.setXAccelOffset(5573);
         mpu.setYAccelOffset(3483);
@@ -47,6 +52,13 @@ void setup() {
 
     // pinMode(MPU_INT, INPUT);
     // attachInterrupt(MPU_INT, ISR, RISING);
+}
+
+static inline
+float gyro_raw2degree(int16_t raw, uint32_t us) {
+    constexpr float LSB = float(1 << 15) / (250 << GY_FS_SEL); // LSB/dps
+    float degree =  raw / LSB; // raw to dps
+    return degree * us / 1e6;
 }
 
 static inline
@@ -60,16 +72,33 @@ float accel_raw2pitch(int16_t ax, int16_t ay, int16_t az) {
 }
 
 void loop() {
-    float roll, pitch;
+    static uint32_t prev_us;
+    static float roll, pitch, yaw;
+
+    float groll, gpitch, gyaw;
+    float aroll, apitch;
 
     int16_t ax, ay, az;
     mpu.getAcceleration(&ax, &ay, &az);
+    aroll = accel_raw2roll(ax, ay, az);
+    apitch = accel_raw2pitch(ax, ay, az);
 
-    roll = accel_raw2roll(ax, ay, az);
-    pitch = accel_raw2pitch(ax, ay, az);
-    
+    int16_t gx, gy, gz;
+    mpu.getRotation(&gx, &gy, &gz);
+    uint32_t curr_us = micros();
+    uint32_t diff_us = curr_us - prev_us;
+    groll   = gyro_raw2degree(gx, diff_us);
+    gpitch  = gyro_raw2degree(gy, diff_us);
+    gyaw    = gyro_raw2degree(gz, diff_us);
+    prev_us = curr_us;
+
+    roll    = COMPLE_A * (roll + groll) + (1 - COMPLE_A) * aroll;
+    pitch   = COMPLE_A * (pitch + gpitch) + (1 - COMPLE_A) * apitch;
+    yaw     = (yaw + gyaw);
+
     Serial.print(roll); Serial.print(' ');
-    Serial.print(pitch); Serial.println();
+    Serial.print(pitch); Serial.print(' ');
+    Serial.print(yaw); Serial.println();
 }
 
 #endif /* FILE */

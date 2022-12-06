@@ -48,14 +48,14 @@ void setup() {
 
 /** Raw data to degree
  * dps means degree per second
- * @param gx gyro raw data
+ * @param raw gyro raw data
  * @param us micro second
  * @return unit is degree
  */
 static inline
-float gyro_raw_to_degree(int16_t gx, uint32_t us) {
+float gyro_raw2degree(int16_t raw, uint32_t us) {
     constexpr float LSB = float(1 << 15) / (250 << GY_FS_SEL); // LSB/dps
-    float degree =  gx / LSB; // raw to dps
+    float degree =  raw / LSB; // raw to dps
     return degree * us / 1e6;
 }
 
@@ -73,9 +73,9 @@ void loop() {
         uint32_t diff_us = curr_us - prev_us;
         mpu.getRotation(&gx, &gy, &gz);
 
-        roll += gyro_raw_to_degree(gx, diff_us);
-        pitch += gyro_raw_to_degree(gy, diff_us);
-        yaw += gyro_raw_to_degree(gz, diff_us);
+        roll += gyro_raw2degree(gx, diff_us);
+        pitch += gyro_raw2degree(gy, diff_us);
+        yaw += gyro_raw2degree(gz, diff_us);
     }
 
     Serial.print(roll); Serial.print(' ');
