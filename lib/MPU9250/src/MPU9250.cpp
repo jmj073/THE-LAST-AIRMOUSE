@@ -62,7 +62,7 @@ MPU9250::MPU9250(uint8_t address) {
  */
 void MPU9250::initialize() {
     setSleepEnabled(false); // thanks to Jack Elston for pointing this one out!
-    delay(35); // Gyroscope Startup Time(From Sleep mode)
+    delay(35); //! Gyroscope Startup Time(From Sleep mode)
     setClockSource(MPU9250_CLOCK_PLL_XGYRO);
     setFullScaleGyroRange(MPU9250_GYRO_FS_250);
     setFullScaleAccelRange(MPU9250_ACCEL_FS_2);
