@@ -42,10 +42,7 @@ SMotion6 SMotion6::operator-(const SMotion6& lhs) {
 
 MPU9250Calibrator::MPU9250Calibrator(MPU9250* mpu)
     : m_mpu{ mpu }
-{
-    afs = m_mpu->getFullScaleAccelRange();
-    gfs = m_mpu->getFullScaleGyroRange();
-}
+{ }
 
 void MPU9250Calibrator::calibrate6() {
     SMotion6 mean, offset;
@@ -60,16 +57,16 @@ void MPU9250Calibrator::calibrate6() {
         get_mean_motion6(&mean, 1000);
 
         Serial.println("offset");
-        log_offset(offset);
+        log_sensors(offset);
         Serial.println("mean");
-        log_offset(mean);
+        log_sensors(mean);
 
         mean_to_offset(&mean);
 
         offset += mean;
     }
 
-    log_offset(offset);
+    log_sensors(offset);
 }
 
 
@@ -102,10 +99,12 @@ void MPU9250Calibrator::get_mean_motion6(SMotion6* s, size_t n) {
 void MPU9250Calibrator::mean_to_offset(SMotion6* s) const {
     SMotion6& m = *s;
 
+    int16_t afs = m_mpu->getFullScaleAccelRange();
     m.a.x = -m.a.x >> (3 - afs);
     m.a.y = -m.a.y >> (3 - afs);
     m.a.z = ((1 << (14 - afs)) - m.a.z) >> (3 - afs); // z축에는 1G가 있다
 
+    int16_t gfs = m_mpu->getFullScaleGyroRange();
     m.g.x = -m.g.x << gfs >> 2;
     m.g.y = -m.g.y << gfs >> 2;
     m.g.z = -m.g.z << gfs >> 2;
@@ -121,7 +120,7 @@ void MPU9250Calibrator::set_offsets(const SMotion6& s) {
     m_mpu->setZGyroOffsetUser(s.g.z);
 }
 
-void MPU9250Calibrator::log_offset(const SMotion6& s) const {
+void MPU9250Calibrator::log_sensors(const SMotion6& s) const {
     Serial.printf("ax: %7hd, ", s.a.x);
     Serial.printf("ay: %7hd, ", s.a.y);
     Serial.printf("az: %7hd, ", s.a.z);

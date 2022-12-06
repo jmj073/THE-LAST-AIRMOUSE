@@ -40,11 +40,10 @@ private:
     void get_mean_motion6(SMotion6* s, size_t n);
     void mean_to_offset(SMotion6* s) const;
     void set_offsets(const SMotion6& s);
-    void log_offset(const SMotion6& s) const;
+    void log_sensors(const SMotion6& s) const;
 
 private:
     MPU9250* m_mpu;
-    int16_t afs, gfs;
 };
 
 #endif /* _MPU9250_CALIBRATOR_H_ */
