@@ -12,32 +12,36 @@
 
 #include <Arduino.h>
 
-SMotion6 SMotion6::operator+(const SMotion6& lhs) {
-    SMotion6 tmp = *this;
-
-    tmp.a.x += lhs.a.x;
-    tmp.a.y += lhs.a.y;
-    tmp.a.z += lhs.a.z;
-
-    tmp.g.x += lhs.g.x;
-    tmp.g.y += lhs.g.y;
-    tmp.g.z += lhs.g.z;
-
-    return tmp;
+SMotion6 SMotion6::operator+(const SMotion6& lhs) const {
+    return SMotion6{ *this } += lhs;
 }
 
-SMotion6 SMotion6::operator-(const SMotion6& lhs) {
-    SMotion6 tmp = *this;
+SMotion6& SMotion6::operator+=(const SMotion6& lhs) {
+    a.x += lhs.a.x;
+    a.y += lhs.a.y;
+    a.z += lhs.a.z;
 
-    tmp.a.x -= lhs.a.x;
-    tmp.a.y -= lhs.a.y;
-    tmp.a.z -= lhs.a.z;
+    g.x += lhs.g.x;
+    g.y += lhs.g.y;
+    g.z += lhs.g.z;
 
-    tmp.g.x -= lhs.g.x;
-    tmp.g.y -= lhs.g.y;
-    tmp.g.z -= lhs.g.z;
+    return *this;
+}
 
-    return tmp;
+SMotion6 SMotion6::operator-(const SMotion6& lhs) const {
+    return SMotion6{ *this } -= lhs;
+}
+
+SMotion6& SMotion6::operator-=(const SMotion6& lhs)  {
+    a.x -= lhs.a.x;
+    a.y -= lhs.a.y;
+    a.z -= lhs.a.z;
+
+    g.x -= lhs.g.x;
+    g.y -= lhs.g.y;
+    g.z -= lhs.g.z;
+
+    return *this;
 }
 
 MPU9250Calibrator::MPU9250Calibrator(MPU9250* mpu)

@@ -11,14 +11,10 @@ struct SMotion6 {
         int16_t x, y, z;
     } g;
 
-    SMotion6 operator+(const SMotion6& lhs);
-    SMotion6& operator+=(const SMotion6& lhs) {
-        return *this = *this + lhs;
-    }
-    SMotion6 operator-(const SMotion6& lhs);
-    SMotion6& operator-=(const SMotion6& lhs) {
-        return *this = *this - lhs;
-    }
+    SMotion6 operator+(const SMotion6& lhs) const;
+    SMotion6& operator+=(const SMotion6& lhs);
+    SMotion6 operator-(const SMotion6& lhs) const;
+    SMotion6& operator-=(const SMotion6& lhs);
 };
 
 class MPU9250Calibrator {

@@ -1,18 +1,21 @@
-// #include <Arduino.h>
-// #include <BleMouse.h>
+#if 1 /* FILE*/
 
-// static BleMouse  mouse;
+#include <Arduino.h>
+#include <BleMouse.h>
 
-// void setup() {
-//     Serial.begin(115200);
-//     Serial.println("Starting BLE work!");
-//     mouse.begin();
-// }
+static BleMouse  mouse;
 
-// void loop() {
-//     if(mouse.isConnected()) {
-//         // Serial.println("move right!");
-//         mouse.move(127, -100);
-//     }
-//     delay(2000);
-// }
+void setup() {
+    Serial.begin(115200);
+    Serial.println("Starting BLE work!");
+    mouse.begin();
+}
+
+void loop() {
+    if(mouse.isConnected()) {
+        mouse.move(127, -100);
+    }
+    delay(2000);
+}
+
+#endif /* FILE*/
