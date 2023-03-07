@@ -1,4 +1,4 @@
-#if 1 /* FILE*/
+#if 0 /* FILE*/
 
 #include <Arduino.h>
 #include <BleMouse.h>
@@ -13,9 +13,9 @@ void setup() {
 
 void loop() {
     if(mouse.isConnected()) {
-        mouse.move(127, -100);
+        mouse.move(10, -10);
     }
-    delay(2000);
+    delay(500);
 }
 
 #endif /* FILE*/

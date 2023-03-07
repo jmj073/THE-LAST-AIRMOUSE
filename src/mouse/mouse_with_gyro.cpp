@@ -5,11 +5,21 @@
 
 #include <MPU9250.h>
 #include <Wire.h>
+#include <BleMouse.h>
+#include <algorithm>
 
 #define my_assert(expr, fmt, ...)\
 if (!(expr)) {\
     log_e(fmt, ##__VA_ARGS__);\
     while (1) { yield(); }\
+}
+
+template<typename _Tp>
+constexpr const _Tp&
+clamp(const _Tp& __val, const _Tp& __lo, const _Tp& __hi)
+{
+    __glibcxx_assert(!(__hi < __lo));
+    return (__val < __lo) ? __lo : (__hi < __val) ? __hi : __val;
 }
 
 #define MPU_INT 19
@@ -18,11 +28,14 @@ if (!(expr)) {\
 #define LED_ON  LOW
 #define LED_OFF HIGH
 
+static BleMouse mouse;
 static MPU9250 mpu;
 constexpr uint8_t GY_FS_SEL = MPU9250_GYRO_FS_250;
 
 void setup() {
     Serial.begin(115200);
+
+    mouse.begin();
 
     Wire.begin();
     Wire.setClock(400000);
@@ -42,6 +55,8 @@ void setup() {
         mpu.setZGyroOffsetUser(32);
     }
 
+
+
     // pinMode(MPU_INT, INPUT);
     // attachInterrupt(MPU_INT, ISR, RISING);
 }
@@ -60,30 +75,45 @@ float gyro_raw2degree(int16_t raw, uint32_t us) {
 }
 
 void loop() {
-    static float roll, pitch, yaw;
-    static uint32_t prev_us;
+    static uint32_t prev_us, tick_us;
+    static float pitch, yaw;
     static bool is_first = true;
 
-    uint32_t curr_us = micros();
+    if (mouse.isConnected()) {
 
-    if (is_first) {
-        is_first = false;
-    } else {
-        int16_t gx, gy, gz;
+        if (is_first) {
+            is_first = false;
+            pitch = yaw = 0;
+            tick_us = prev_us = micros();
+            return;
+        }
+
+        uint32_t curr_us = micros();
         uint32_t diff_us = curr_us - prev_us;
+        prev_us = curr_us;
+
+        int16_t gx, gy, gz;
         mpu.getRotation(&gx, &gy, &gz);
 
-        roll += gyro_raw2degree(gx, diff_us);
-        pitch += gyro_raw2degree(gy, diff_us);
-        yaw += gyro_raw2degree(gz, diff_us);
+        pitch   += gyro_raw2degree(gy, diff_us);
+        yaw     += gyro_raw2degree(gz, diff_us);
+
+        if (curr_us - tick_us >= uint32_t(1e4)) { // 10ms
+            tick_us = curr_us;
+
+            auto p = (signed char)clamp<int32_t>(pitch, -128, 127);
+            auto y = (signed char)clamp<int32_t>(yaw, -128, 127);
+
+            pitch -= p;
+            yaw -= y;
+
+            mouse.move(-y, p);
+        }
+
+    } else {
+        is_first = true;
     }
 
-    Serial.print(roll); Serial.print(' ');
-    Serial.print(pitch); Serial.print(' ');
-    Serial.print(yaw); Serial.print(' ');
-    Serial.println();
-
-    prev_us = curr_us;
 }
 
 #endif /* FILE */
