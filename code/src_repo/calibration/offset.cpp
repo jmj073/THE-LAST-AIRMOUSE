@@ -24,7 +24,7 @@ void IRAM_ATTR ISR_FIFO_OVF() {
 	digitalWrite(LED, LED_ON);
 }
 
-#if 0 /* GET OFFSET*/
+#if 1 /* GET OFFSET*/
 
 void setup() {
     Serial.begin(115200);
@@ -37,12 +37,21 @@ void setup() {
         mpu.reset();
         mpu.initialize();
 
+/*
+accel
+      5622      3472      9986
+gyro
+        32        42        48
+gyro user
+         0         0         0
+*/        
+
         Serial.println("accel");
         Serial.printf("%10hd", mpu.getXAccelOffset());
         Serial.printf("%10hd", mpu.getYAccelOffset());
         Serial.printf("%10hd", mpu.getZAccelOffset());
         Serial.println();
-        Serial.println("gyro");
+        Serial.println("gyro"); // self test
         Serial.printf("%10hd", mpu.getXGyroOffset());
         Serial.printf("%10hd", mpu.getYGyroOffset());
         Serial.printf("%10hd", mpu.getZGyroOffset());
@@ -59,7 +68,7 @@ void loop() { }
 
 #endif /* GET OFFSET*/
 
-#if 1 /* ACCEL */
+#if 0 /* ACCEL */
 
 void setup() {
     Serial.begin(115200);

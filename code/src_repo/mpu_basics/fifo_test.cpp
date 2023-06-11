@@ -43,7 +43,7 @@ void setup() {
         // mpu.setAccelFIFOEnabled(true);
         mpu.setXGyroFIFOEnabled(true);
         mpu.setYGyroFIFOEnabled(true);
-        mpu.setXGyroFIFOEnabled(true);
+        mpu.setZGyroFIFOEnabled(true);
     }
 
     // Serial.println("ax ay az gx gy gz");

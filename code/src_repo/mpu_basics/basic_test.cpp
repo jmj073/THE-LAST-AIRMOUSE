@@ -36,13 +36,13 @@ void loop() {
     // Serial.printf("gy = %6hd | ", gy);
     // Serial.printf("gz = %6hd | ", gz);
 
-    // Serial.printf("%hd ", ax);
-    // Serial.printf("%hd ", ay);
-    // Serial.printf("%hd ", az);
+    Serial.printf("%hd ", ax);
+    Serial.printf("%hd ", ay);
+    Serial.printf("%hd ", az);
 
-    Serial.printf("%hd ", gx);
-    Serial.printf("%hd ", gy);
-    Serial.printf("%hd ", gz);
+    // Serial.printf("%hd ", gx);
+    // Serial.printf("%hd ", gy);
+    // Serial.printf("%hd ", gz);
 
     Serial.println();
 

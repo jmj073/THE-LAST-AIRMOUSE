@@ -1,4 +1,4 @@
-#if 1 /* FILE */
+#if 0 /* FILE */
 /* gyro raw data to degree(roll, pitch, yaw) */
 
 #include <Arduino.h>
@@ -14,12 +14,6 @@ if (!(expr)) {\
     while (1) { yield(); }\
 }
 
-#define MPU_INT 15
-
-#define LED     LED_BUILTIN
-#define LED_ON  LOW
-#define LED_OFF HIGH
-
 template<typename _Tp>
 constexpr const _Tp&
 clamp(const _Tp& __val, const _Tp& __lo, const _Tp& __hi)
@@ -28,7 +22,11 @@ clamp(const _Tp& __val, const _Tp& __lo, const _Tp& __hi)
     return (__val < __lo) ? __lo : (__hi < __val) ? __hi : __val;
 }
 
-void mpu_loop();
+#define MPU_INT 19
+
+#define LED     LED_BUILTIN
+#define LED_ON  LOW
+#define LED_OFF HIGH
 
 static BleMouse mouse;
 static MPU9250 mpu;
@@ -63,6 +61,19 @@ void setup() {
     // attachInterrupt(MPU_INT, ISR, RISING);
 }
 
+/** Raw data to degree
+ * dps means degree per second
+ * @param raw gyro raw data
+ * @param us micro second
+ * @return unit is degree
+ */
+static inline
+float gyro_raw2degree(int16_t raw, uint32_t us) {
+    constexpr float LSB = float(1 << 15) / (250 << GY_FS_SEL); // LSB/dps
+    float degree =  raw / LSB; // raw to dps
+    return degree * us / 1e6;
+}
+
 void loop() {
     static uint32_t prev_us, tick_us;
     static float pitch, yaw;
@@ -84,8 +95,8 @@ void loop() {
         int16_t gx, gy, gz;
         mpu.getRotation(&gx, &gy, &gz);
 
-        pitch   += gyro_raw2degree(gy, diff_us) * 8;
-        yaw     += gyro_raw2degree(gz, diff_us) * 8;
+        pitch   += gyro_raw2degree(gy, diff_us) * 16;
+        yaw     += gyro_raw2degree(gz, diff_us) * 16;
 
         if (curr_us - tick_us >= uint32_t(1e4)) { // 10ms
             tick_us = curr_us;
