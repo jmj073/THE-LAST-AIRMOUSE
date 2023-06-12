@@ -1,5 +1,4 @@
 #if 1 /* FILE */
-/* gyro raw data to degree(roll, pitch, yaw) */
 
 // #define DEBUG
 #include "settings.h"
@@ -16,6 +15,7 @@
 #include "utils.h"
 #include "MyButton.h"
 #include "mouse_move_looper.h"
+#include "keyboard_looper.h"
 
 constexpr uint8_t GY_FS_SEL = MPU9250_GYRO_FS_250;
 
@@ -26,28 +26,26 @@ float gyro_raw2degree(int16_t raw, unsigned long us) {
     return degree * us / 1e6;
 }
 
-static void do_nothing() { }
 
 static void handle_left_click(bool state);
 static void handle_right_click(bool state);
 static void handle_joystick_btn(bool state);
-
-static void handle_joystick_for_keyboard();
-
 static MouseMoveLooper::InputData handle_imu4move_mouse(unsigned long interval);
-
-static void (*keyboard_handler)() = handle_joystick_for_keyboard;
+static KeyboardLooper::InputData handle_joystick_for_keyboard(unsigned long);
+static KeyboardLooper::InputData return_zero_for_keyboard(unsigned long) {
+    return KeyboardLooper::InputData(0);
+}
 
 static BleCombo combo;
 static MPU9250 mpu;
-
 static MyButton button_left(PIN_LEFT_CLICK, handle_left_click);
 static MyButton button_right(PIN_RIGHT_CLICK, handle_right_click);
 static MyButton button_joystick(PIN_JOYSTICK_BTN, handle_joystick_btn);
-
 static MouseMoveLooper mouse_move_looper(handle_imu4move_mouse, &combo);
+static KeyboardLooper keyboard_looper(handle_joystick_for_keyboard, &combo);
 
-static bool IMU_ENABLE = true;
+enum class JoystickMode { KEYBOARD, MOUSE };
+static JoystickMode joystick_mode = JoystickMode::KEYBOARD;
 
 static
 void setup_mpu() {
@@ -101,10 +99,10 @@ void loop() {
     }
 
     button_left.loop();
-    button_right.loop();    
+    button_right.loop();
     button_joystick.loop();
 
-    keyboard_handler();
+    keyboard_looper.loop();
 
     mouse_move_looper.loop();
     mouse_move_looper.getOutputHandler().moveMouse();
@@ -119,7 +117,7 @@ MouseMoveLooper::InputData handle_imu4move_mouse(unsigned long interval) {
     return {
         .yaw   = gyro_raw2degree(gz, interval) * 16,
         .pitch = gyro_raw2degree(gy, interval) * 16,
-    };   
+    };
 }
 
 static
@@ -130,7 +128,7 @@ MouseMoveLooper::InputData handle_joystick4move_mouse(unsigned long interval) {
     return {
         .yaw = (int64_t)interval * y / (1e6f * 3),
         .pitch   = (int64_t)interval * x / (1e6f * 3),
-    };   
+    };
 }
 
 static
@@ -154,37 +152,50 @@ void handle_right_click(bool state) {
 }
 
 static
-void handle_joystick_btn(bool state) {
-    if (!state) {
-        DEBUG_PRINTLN("joystick button pressed!");
-        IMU_ENABLE = !IMU_ENABLE;
-        // mouse_move_handler = IMU_ENABLE ? handle_imu : handle_joystick_for_move_mouse;
-        mouse_move_looper.setInputHandler(IMU_ENABLE ? handle_imu4move_mouse : handle_joystick4move_mouse);
-        keyboard_handler = IMU_ENABLE ? handle_joystick_for_keyboard : do_nothing;
+void toggle_joystick_mode() {
+    switch (joystick_mode) {
+        case JoystickMode::KEYBOARD:
+            joystick_mode = JoystickMode::MOUSE;
+            break;
+        case JoystickMode::MOUSE:
+            joystick_mode = JoystickMode::KEYBOARD;
+            break;
     }
 }
 
 static
-void handle_joystick_for_keyboard() {
-    static char ad = 0;
-    static char ws = 0;
+void handle_joystick_btn(bool state) {
+    if (state) return;
 
+    DEBUG_PRINTLN("joystick button pressed!");
+
+    toggle_joystick_mode();
+
+    switch (joystick_mode) {
+        case JoystickMode::KEYBOARD:
+            mouse_move_looper.setInputHandler(handle_imu4move_mouse);
+            keyboard_looper.setInputHandler(handle_joystick_for_keyboard);
+            break;
+        case JoystickMode::MOUSE:
+            mouse_move_looper.setInputHandler(handle_joystick4move_mouse);
+            keyboard_looper.setInputHandler(return_zero_for_keyboard);
+            break;
+    }
+}
+
+static
+KeyboardLooper::InputData handle_joystick_for_keyboard(unsigned long) {
     int x = analogRead(PIN_JOYSTICK_X) - 1958;
     int y = analogRead(PIN_JOYSTICK_Y) - 2019;
 
-    char tmp_ws = x < -1000 ? 'w' : (x > 1000 ? 's' : 0);
-    if (tmp_ws != ws) {
-        if (ws) combo.release(ws);
-        ws = tmp_ws;
-        if (ws)combo.press(ws);
-    }
+    uint8_t key{};
+    key |= x < -1000 ? KeyboardHandler::KEY_W 
+        : (x > 1000 ? KeyboardHandler::KEY_S : 0);
 
-    char tmp_ad = y < -1000 ? 'd' : (y > 1000 ? 'a' : 0);
-    if (tmp_ad != ad) {
-        if (ad) combo.release(ad);
-        ad = tmp_ad;
-        if (ad) combo.press(ad);
-    }
+    key |= y < -1000 ? KeyboardHandler::KEY_D
+        : (y > 1000 ? KeyboardHandler::KEY_A : 0);
+
+    return KeyboardLooper::InputData(key);
 }
 
 #endif /* FILE */
