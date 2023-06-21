@@ -45,25 +45,25 @@ namespace mouse_move {
 
     public:
         explicit OutputHandler(BleCombo* combo)
-            : combo{ combo }, yaw{ 0 }, pitch{ 0 }, prev_ms{ 0 }
+            : combo{ combo }, move_x{ 0 }, move_y{ 0 }, prev_ms{ 0 }
         { }
 
         void moveMouse();
 
     public: // OutputHandler trait for Looper
         void operator()(const InputData& input) {
-            yaw += input.x;
-            pitch += input.y;
+            move_x += input.x;
+            move_y += input.y;
         }
 
         void reset() {
-            yaw = pitch = 0;
+            move_x = move_y = 0;
         }
 
     private:
         BleCombo* combo;
-        double yaw;
-        double pitch;
+        double move_x;
+        double move_y;
         unsigned long prev_ms;
     };
 

@@ -6,14 +6,20 @@
 #include "mouse_move_looper.h"
 
 #include <MPU9250.h>
-#include "pins.h"
+#include "joystick.h"
 #include "utils.h"
 #include "debug.h"
 
 using namespace mouse_move;
 
-static constexpr size_t ONLY_GYRO_FIFO_PACKET_SIZE = 4;
-static constexpr size_t GYRO_ACCEL_FIFO_PACKET_SIZE = 12;
+static constexpr const float MOUSE_SPEED_IMU_X = 16;
+static constexpr const float MOUSE_SPEED_IMU_Y = 16;
+
+static constexpr const float MOUSE_SPEED_JOYSTICK_X = 0.3;
+static constexpr const float MOUSE_SPEED_JOYSTICK_Y = 0.3;
+
+static constexpr const size_t ONLY_GYRO_FIFO_PACKET_SIZE = 4;
+static constexpr const size_t GYRO_ACCEL_FIFO_PACKET_SIZE = 12;
 
 #ifdef IMU_USE_ACCELEROMETER
     static constexpr size_t FIFO_PACKET_SIZE = GYRO_ACCEL_FIFO_PACKET_SIZE;
@@ -105,8 +111,8 @@ static Move handle_imu4move_mouse(unsigned long interval) {
     int32_t ax2 = ax * ax, ay2 = ay * ay, az2 = az * az;
     double n = ay2 + az2, m = n + ax2;
 
-    float yaw   = float((ax2/m * dx) + (ay2/m * dy) + (az2/m * dz)) * 16;
-    float pitch = float((az2/n * dy) + (ay2/n * dz)) * 16;
+    float yaw   = float((ax2/m * dx) + (ay2/m * dy) + (az2/m * dz));
+    float pitch = float((az2/n * dy) + (ay2/n * dz));
     // measure::end();
 #else /* IMU_USE_ACCELEROMETER */
     int16_t gy, gz;
@@ -115,21 +121,34 @@ static Move handle_imu4move_mouse(unsigned long interval) {
     IMU_getGyroYZ(mpu, &gy, &gz);
     // measure::end();
 
-    float yaw   = gyro_raw2degree(gz, interval) * 16;
-    float pitch = gyro_raw2degree(gy, interval) * 16;
+    float yaw   = gyro_raw2degree(gz, interval);
+    float pitch = gyro_raw2degree(gy, interval);
 #endif /* IMU_USE_ACCELEROMETER */
 
-    return { .x = yaw, .y = pitch };
+    if constexpr (false) {
+        static Measure<double> measure(1000,
+            [&] (double minv, double meanv, double maxv) {
+                Serial.printf("min: %lf, mean: %lf, max: %lf\r\n",
+                    minv, meanv, maxv);
+            });
+        // min: 0.000000, mean: 0.000172, max: 0.001863 
+        measure.appendValue(abs(yaw));
+    }
+
+    return { 
+        .x = yaw * MOUSE_SPEED_IMU_X,
+        .y = pitch * MOUSE_SPEED_IMU_Y,
+    };
 }
 
 static
 Move handle_joystick4move_mouse(unsigned long interval) {
-    int x = analogRead(PIN_JOYSTICK_X) - 1958;
-    int y = analogRead(PIN_JOYSTICK_Y) - 2019;
+    int x = joystickGetX();
+    int y = joystickGetY();
 
     return {
-        .x = (int64_t)interval * y / (1e6f * 3),
-        .y = (int64_t)interval * x / (1e6f * 3),
+        .x = (int64_t)interval * y / (1e6f / MOUSE_SPEED_JOYSTICK_X),
+        .y = (int64_t)interval * x / (1e6f / MOUSE_SPEED_JOYSTICK_Y),
     };
 }
 
@@ -229,12 +248,12 @@ void OutputHandler::moveMouse() {
     if (curr_ms - prev_ms >= BLE_SEND_INTERVAL) {
         prev_ms = curr_ms;
 
-        auto y = (signed char)std::clamp<int32_t>(yaw, -128, 127);
-        auto p = (signed char)std::clamp<int32_t>(pitch, -128, 127);
+        auto x = (signed char)std::clamp<int32_t>(move_x, -128, 127);
+        auto y = (signed char)std::clamp<int32_t>(move_y, -128, 127);
 
-        yaw -= y;
-        pitch -= p;
+        move_x -= x;
+        move_y -= y;
 
-        combo->move(-y, p);
+        combo->move(-x, y);
     }
 }

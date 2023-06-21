@@ -3,8 +3,10 @@
 
 #include <Arduino.h>
 #include <functional>
+#include <algorithm>
+#include <limits>
 
-#if __cplusplus < 201700
+#if __cplusplus < 201700L
 namespace std {
     template<typename _Tp>
     constexpr const _Tp&
@@ -14,34 +16,67 @@ namespace std {
         return (__val < __lo) ? __lo : (__hi < __val) ? __hi : __val;
     }
 }
-#else
-#include <algorithm>
 #endif
 
+template <typename Data>
 class Measure {
 public:
-    Measure(size_t measure_cnt, std::function<void(unsigned long)> on_measure_finished)
-        : measure_cnt{ measure_cnt }, on_measure_finished{ on_measure_finished }
-    { }
+    using Handler = std::function<void(Data minv, Data meanv, Data maxv)>;
 
-    void start() {
-       start_time = micros();
+public:
+    Measure(size_t measure_cnt, Handler on_measure_finished)
+        : measure_cnt{ measure_cnt }
+        , on_measure_finished{ std::move(on_measure_finished) }
+    {
+        resetMeasureValue();
     }
 
-    void stop() {
-        time_sum += micros() - start_time;
+    void appendValue(Data value) {
+        minv = std::min(minv, value);
+        sumv += value;
+        maxv = std::max(maxv, value);
+
         if (++cnt >= measure_cnt) {
-            on_measure_finished(time_sum / measure_cnt);
-            time_sum = cnt = 0;
+            on_measure_finished(minv, sumv / measure_cnt, maxv);
+            resetMeasureValue();
         }
+    }
+
+    size_t currentMeasureCount() const {
+        return cnt;
+    }
+
+private:
+    void resetMeasureValue() {
+        cnt = 0;
+        sumv = 0;
+        minv = std::numeric_limits<Data>::max();
+        maxv = std::numeric_limits<Data>::min();
     }
 
 private:
     size_t measure_cnt;
-    std::function<void(unsigned long)> on_measure_finished;
-    unsigned long start_time;
-    long cnt = 0;
-    unsigned long time_sum = 0;
+    Handler on_measure_finished;
+    size_t cnt;
+    Data minv;
+    Data sumv;
+    Data maxv;
+};
+
+class MeasureTime: public Measure<unsigned long> {
+public:
+    using Measure::Measure;
+
+    void measureStart() {
+        start_us = micros();
+    }
+
+    void measureStop() {
+        appendValue(micros() - start_us);
+    }
+
+private:
+    unsigned long start_us;
 };
 
 #endif /* _UTILS_H_ */
