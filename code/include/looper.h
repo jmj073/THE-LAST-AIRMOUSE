@@ -5,11 +5,24 @@
 #include <functional>
 #include <utility>
 
-template <typename OutputHandler>
+/* type trait
+
+InputHandler:
+    type: InputData
+    function: InputData operator()(unsigned long interval_us)
+    function: void reset()
+    function: bool available() const
+
+OutputHandler:
+    type: InputData
+    function: void operator()(InputData input) // or (const InputData& input), ...
+    function: reset()
+*/
+
+template <typename InputHandler, typename OutputHandler>
 class Looper {
 public: // define type
-    using InputData = typename OutputHandler::InputData;
-    using InputHandler = std::function<InputData(unsigned long interval)>;
+    using InputData = typename InputHandler::InputData;
 
 public: // delete function
     Looper(const Looper&) = delete;
@@ -18,12 +31,16 @@ public: // delete function
     Looper& operator=(Looper&&) = delete;
 
 public:
-    template <typename ... Types>
-    Looper(InputHandler iHandler, Types&& ... args)
-        : iHandler { std::move(iHandler) }, oHandler{ std::forward<Types>(args) ... }
+    Looper(InputHandler iHandler, OutputHandler oHandler)
+        : iHandler{ std::move(iHandler) }, oHandler{ std::move(oHandler) }
     { }
 
-    void setInputHandler(InputHandler handler);
+    InputHandler& getInputHandler() {
+        return iHandler;
+    }
+    const InputHandler& getInputHandler() const {
+        return iHandler;
+    }
 
     OutputHandler& getOutputHandler() {
         return oHandler;
@@ -42,21 +59,21 @@ private:
     bool isFirst = true;
 };
 
-template <typename H>
-void Looper<H>::setInputHandler(InputHandler handler) {
-    this->isFirst = true;
-    this->iHandler = std::move(handler);
-}
-
-
-template <typename H>
-void Looper<H>::reset() {
+template <typename IH, typename OH>
+void Looper<IH, OH>::reset() {
     isFirst = true;
+    iHandler.reset();
     oHandler.reset();
 }
 
-template <typename H>
-void Looper<H>::loop() {
+template <typename IH, typename OH>
+void Looper<IH, OH>::loop() {
+    // if (!iHandler.available()) return;
+    if (!iHandler.available()) {
+        isFirst = true;
+        return;
+    }
+    
     if (isFirst) {
         isFirst = false;
         prev_us = micros();
@@ -67,8 +84,7 @@ void Looper<H>::loop() {
     unsigned long interval = curr_us - prev_us;
     prev_us = curr_us;
 
-    auto input = iHandler(interval);
-    oHandler(std::move(input));
+    oHandler(iHandler(interval));
 }
 
 #endif /* _LOOPER_H_ */

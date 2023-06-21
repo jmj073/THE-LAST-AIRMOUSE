@@ -275,6 +275,15 @@ void MPU9250::setFullScaleGyroRange(uint8_t range) {
     I2Cdev::writeBits(devAddr, MPU9250_RA_GYRO_CONFIG, MPU9250_GCONFIG_FS_SEL_BIT, MPU9250_GCONFIG_FS_SEL_LENGTH, range);
 }
 
+uint8_t MPU9250::getFchoiceB() {
+    I2Cdev::readBits(devAddr, MPU9250_RA_GYRO_CONFIG, MPU9250_GCONFIG_FCHOICE_B_BIT, MPU9250_GCONFIG_FCHOICE_B_LENGTH, buffer);
+    return buffer[0];
+}
+
+void MPU9250::setFchoiceB(uint8_t Fchoice_b) {
+    I2Cdev::writeBits(devAddr, MPU9250_RA_GYRO_CONFIG, MPU9250_GCONFIG_FCHOICE_B_BIT, MPU9250_GCONFIG_FCHOICE_B_LENGTH, Fchoice_b);
+}
+
 // ACCEL_CONFIG register
 
 /** Get self-test enabled setting for accelerometer X axis.

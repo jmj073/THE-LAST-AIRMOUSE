@@ -5,34 +5,68 @@
 
 #include "looper.h"
 
-class KeyboardHandler;
-using KeyboardLooper = Looper<KeyboardHandler>;
+namespace keyboard {
+    class InputHandler;
+    class OutputHandler;
+    using KeyboardLooper = Looper<InputHandler, OutputHandler>;
 
-class KeyboardHandler {
-public:
     enum KEY: uint8_t {
-        KEY_W = 1<<0,
-        KEY_A = 1<<1,
-        KEY_S = 1<<2,
-        KEY_D = 1<<3,
+            KEY_W = 1<<0,
+            KEY_A = 1<<1,
+            KEY_S = 1<<2,
+            KEY_D = 1<<3,
     };
-    using InputData = KEY;
 
-public:
-    KeyboardHandler(BleCombo* combo)
-        : combo{ combo }, key{}
-    { }
+    class InputHandler {
+    public:
+        using InputData = KEY;
 
-    void operator()(const InputData& input);
+    public:
+        InputHandler()
+            : enable{ false }
+        { }
 
-    void reset();
+    public: // InputHandler trait for Looper
+        InputData operator()(unsigned long interval_us);
 
-private:
-    
+        bool available() const {
+            return enable;
+        }
 
-private:
-    BleCombo* combo;
-    KEY key;
-};
+        void inputEnable() {
+            enable = true;
+        }
+
+        void inputDisable() {
+            enable = false;
+        }
+
+        void reset() { }
+
+    private:
+        bool enable;
+    };
+
+    class OutputHandler {
+    public:
+        using InputData = KEY;
+
+    public:
+        explicit OutputHandler(BleCombo* combo)
+            : combo{ combo }, key{}
+        { }
+
+    public: // OutputHandler trait for Looper
+        void operator()(const InputData& input);
+
+        void reset();
+
+    private:
+        BleCombo* combo;
+        KEY key;
+    };
+} /* keyboard */
+
+using keyboard::KeyboardLooper;
 
 #endif /* _KEYBOARD_LOOPER_H_ */

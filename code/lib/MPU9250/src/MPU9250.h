@@ -206,8 +206,10 @@ THE SOFTWARE.
 #define MPU9250_DLPF_BW_10          0x05
 #define MPU9250_DLPF_BW_5           0x06
 
-#define MPU9250_GCONFIG_FS_SEL_BIT      4
-#define MPU9250_GCONFIG_FS_SEL_LENGTH   2
+#define MPU9250_GCONFIG_FS_SEL_BIT          4
+#define MPU9250_GCONFIG_FS_SEL_LENGTH       2
+#define MPU9250_GCONFIG_FCHOICE_B_BIT       1
+#define MPU9250_GCONFIG_FCHOICE_B_LENGTH    2
 
 #define MPU9250_GYRO_FS_250         0x00
 #define MPU9250_GYRO_FS_500         0x01
@@ -418,6 +420,8 @@ THE SOFTWARE.
 #define MPU9250_DMP_MEMORY_BANK_SIZE    256
 #define MPU9250_DMP_MEMORY_CHUNK_SIZE   16
 
+#define MPU9250_FIFO_MAX_SIZE 512
+
 // note: DMP code memory blocks defined at end of header file
 
 class MPU9250 {
@@ -447,6 +451,8 @@ class MPU9250 {
         // GYRO_CONFIG register
         uint8_t getFullScaleGyroRange();
         void setFullScaleGyroRange(uint8_t range);
+        uint8_t getFchoiceB();
+        void setFchoiceB(uint8_t Fchoice_b);
 
         // ACCEL_CONFIG register
         bool getAccelXSelfTest();

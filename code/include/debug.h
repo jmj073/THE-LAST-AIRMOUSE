@@ -1,6 +1,8 @@
 #ifndef _DEBUG_H_
 #define _DEBUG_H_
 
+// #define DEBUG
+
 #ifdef DEBUG
     #define DEBUG_PRINTLN(x) Serial.println(x)
     #define DEBUG_PRINT(x) Serial.print(x)

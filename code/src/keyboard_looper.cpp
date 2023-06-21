@@ -1,7 +1,24 @@
 #include "keyboard_looper.h"
 
+#include "pins.h"
 
-void KeyboardHandler::operator()(const InputData& input) {
+using namespace keyboard;
+
+auto InputHandler::operator()(unsigned long interval_us) -> InputData {
+    int x = analogRead(PIN_JOYSTICK_X) - 1958;
+    int y = analogRead(PIN_JOYSTICK_Y) - 2019;
+
+    uint8_t key{};
+    key |= x < -1000 ? KEY::KEY_W 
+        : (x > 1000 ? KEY::KEY_S : 0);
+
+    key |= y < -1000 ? KEY::KEY_D
+        : (y > 1000 ? KEY::KEY_A : 0);
+
+    return InputData(key);
+}
+
+void OutputHandler::operator()(const InputData& input) {
     if (key == input) return;
     uint8_t changed_key = key ^ input;
 
@@ -20,7 +37,7 @@ void KeyboardHandler::operator()(const InputData& input) {
     key = input;
 }
 
-void KeyboardHandler::reset() {
+void OutputHandler::reset() {
     combo->releaseAll();
     key = (KEY)0;
 }
