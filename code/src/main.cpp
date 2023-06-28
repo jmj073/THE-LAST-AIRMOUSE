@@ -3,16 +3,15 @@
 #include "settings.h"
 
 #include <Arduino.h>
-#include <MPU9250.h>
-#include <Wire.h>
 #include <BleCombo.h>
 
 #include "pins.h"
-#include "debug.h"
 #include "utils.h"
 #include "MyButton.h"
 #include "mouse_move/looper.h"
 #include "keyboard_looper.h"
+
+#include "debug.h"
 #include "measure.h"
 
 #ifdef ENABLE_PROTOTYPE
@@ -116,10 +115,13 @@ void handle_joystick_btn(bool released) {
     switch (joystick_mode) {
         case JoystickMode::KEYBOARD:
             mouse_move_looper.getInputHandler().setInputMode(mouse_move::IMU);
+            mouse_move_looper.reset();
             keyboard_looper.getInputHandler().inputEnable();
+            keyboard_looper.reset();
             break;
         case JoystickMode::MOUSE:
             mouse_move_looper.getInputHandler().setInputMode(mouse_move::JOYSTICK);
+            mouse_move_looper.reset();
             keyboard_looper.getInputHandler().inputDisable();
             break;
     }

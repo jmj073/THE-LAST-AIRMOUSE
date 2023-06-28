@@ -3,7 +3,7 @@
 
 #include "settings.h"
 
-#include "handlers.h"
+#include "imu_handler.h"
 #include "debug.h"
 #include "measure.h"
 
