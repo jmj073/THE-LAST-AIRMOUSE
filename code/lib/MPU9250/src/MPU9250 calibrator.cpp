@@ -105,8 +105,10 @@ void MPU9250Calibrator::mean_to_offset(SMotion6* s) const {
 
     int16_t afs = m_mpu->getFullScaleAccelRange();
     m.a.x = -m.a.x >> (3 - afs);
-    m.a.y = -m.a.y >> (3 - afs);
-    m.a.z = ((1 << (14 - afs)) - m.a.z) >> (3 - afs); // z축에는 1G가 있다
+    // m.a.y = -m.a.y >> (3 - afs);
+    m.a.y = ((1 << (14 - afs)) - m.a.y) >> (3 - afs); // y축에는 1G가 있다
+    // m.a.z = ((1 << (14 - afs)) - m.a.z) >> (3 - afs); // z축에는 1G가 있다
+    m.a.z = -m.a.z >> (3 - afs);
 
     int16_t gfs = m_mpu->getFullScaleGyroRange();
     m.g.x = -m.g.x << gfs >> 2;

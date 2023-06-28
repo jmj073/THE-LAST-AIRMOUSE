@@ -11,14 +11,23 @@
 #include "debug.h"
 #include "utils.h"
 #include "MyButton.h"
-#include "mouse_move_looper.h"
+#include "mouse_move/looper.h"
 #include "keyboard_looper.h"
+#include "measure.h"
 
-static void handle_left_click(bool state);
-static void handle_right_click(bool state);
-static void handle_joystick_btn(bool state);
+#ifdef ENABLE_PROTOTYPE
+    #define DEVICE_NAME "prototype"
+#else /* ENABLE_PROTOTYPE */
+    #define DEVICE_NAME "M416D"
+#endif /* ENABLE_PROTOTYPE */
 
-static BleCombo combo;
+static inline
+void battery_level_refresh_periodically();
+static void handle_left_click(bool released);
+static void handle_right_click(bool released);
+static void handle_joystick_btn(bool released);
+
+static BleCombo combo(DEVICE_NAME);
 static MyButton button_left(PIN_LEFT_CLICK, handle_left_click);
 static MyButton button_right(PIN_RIGHT_CLICK, handle_right_click);
 static MyButton button_joystick(PIN_JOYSTICK_BTN, handle_joystick_btn);
@@ -60,11 +69,13 @@ void loop() {
 
     mouse_move_looper.loop();
     mouse_move_looper.getOutputHandler().moveMouse();
+
+    battery_level_refresh_periodically();
 }
 
 static
-void handle_left_click(bool state) {
-    if (state) {
+void handle_left_click(bool released) {
+    if (released) {
         combo.mouseRelease(MOUSE_LEFT);
     } else {
         DEBUG_PRINTLN("left pressed!");
@@ -73,8 +84,8 @@ void handle_left_click(bool state) {
 }
 
 static
-void handle_right_click(bool state) {
-    if (state) {
+void handle_right_click(bool released) {
+    if (released) {
         combo.mouseRelease(MOUSE_RIGHT);
     } else {
         DEBUG_PRINTLN("right pressed!");
@@ -95,8 +106,8 @@ void toggle_joystick_mode() {
 }
 
 static
-void handle_joystick_btn(bool state) {
-    if (state) return;
+void handle_joystick_btn(bool released) {
+    if (released) return;
 
     DEBUG_PRINTLN("joystick button pressed!");
 
@@ -112,6 +123,30 @@ void handle_joystick_btn(bool state) {
             keyboard_looper.getInputHandler().inputDisable();
             break;
     }
+}
+
+static inline
+int get_battery_level() {
+    return 50;
+}
+
+static inline
+void battery_level_refresh() {
+    combo.setBatteryLevel(get_battery_level());
+}
+
+static inline constexpr
+unsigned long min2ms(unsigned long minute) {
+    return minute * 60 * int(1e3);
+}
+
+static inline
+void battery_level_refresh_periodically() {
+    static unsigned long prev_ms;
+    auto curr_ms = millis();
+
+    if (curr_ms - prev_ms < min2ms(5)) return;
+    battery_level_refresh();
 }
 
 #endif /* FILE */

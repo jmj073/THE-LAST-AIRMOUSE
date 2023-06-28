@@ -1,19 +1,20 @@
 #include "keyboard_looper.h"
 
 #include "pins.h"
+#include "joystick.h"
 
 using namespace keyboard;
 
 auto InputHandler::operator()(unsigned long interval_us) -> InputData {
-    int x = analogRead(PIN_JOYSTICK_X) - 1958;
-    int y = analogRead(PIN_JOYSTICK_Y) - 2019;
+    int x = joystickGetX();
+    int y = joystickGetY();
 
     uint8_t key{};
-    key |= x < -1000 ? KEY::KEY_W 
-        : (x > 1000 ? KEY::KEY_S : 0);
+    key |= x < -1000 ? KEY::KEY_D
+        : (x > 1000 ? KEY::KEY_A : 0);
 
-    key |= y < -1000 ? KEY::KEY_D
-        : (y > 1000 ? KEY::KEY_A : 0);
+    key |= y < -1000 ? KEY::KEY_W 
+        : (y > 1000 ? KEY::KEY_S : 0);
 
     return InputData(key);
 }

@@ -3,7 +3,7 @@
 
 #include <BleCombo.h>
 
-#include "looper.h"
+#include <looper.h>
 
 namespace mouse_move {
     class InputHandler;
@@ -12,6 +12,14 @@ namespace mouse_move {
 
     enum InputMode { IMU, JOYSTICK };
     struct Move { float x, y; };
+
+    class HandlerInterface {
+    public:
+        virtual void reset() { }
+        virtual bool available() const = 0;
+        virtual Move operator()(unsigned long interval_us) = 0;
+        virtual ~HandlerInterface() { }
+    };
 
     class InputHandler {
     public:
@@ -27,16 +35,21 @@ namespace mouse_move {
 
     public: // InputHandler trait for Looper
         InputData operator()(unsigned long interval_us) {
-            return handler(interval_us);
+            return (*handler)(interval_us);
         }
 
-        bool available() const;
+        bool available() const {
+            return handler->available();
+        }
 
-        void reset() { }
+        void reset() {
+            handler->reset();
+        }
 
     private:
         InputMode mode;
-        InputData (*handler)(unsigned long interval);
+        HandlerInterface* handler;
+        // float prev_pitch;
     };
 
     class OutputHandler {
