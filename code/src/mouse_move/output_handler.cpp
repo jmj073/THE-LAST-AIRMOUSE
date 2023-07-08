@@ -1,4 +1,4 @@
-#define BLE_SEND_INTERVAL 7UL // millisecond
+#define BLE_SEND_INTERVAL 12UL // millisecond
 
 #include "looper.h"
 

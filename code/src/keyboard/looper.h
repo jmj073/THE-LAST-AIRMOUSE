@@ -2,8 +2,7 @@
 #define _KEYBOARD_LOOPER_H_
 
 #include <BleCombo.h>
-
-#include "looper.h"
+#include <looper.h>
 
 namespace keyboard {
     class InputHandler;
@@ -27,7 +26,7 @@ namespace keyboard {
         { }
 
     public: // InputHandler trait for Looper
-        InputData operator()(unsigned long interval_us);
+        InputData operator()(unsigned long interval);
 
         bool available() const {
             return enable;

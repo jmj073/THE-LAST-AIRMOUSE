@@ -1,16 +1,11 @@
-// #define IMU_FIFO_ENABLE
-#define IMU_USE_ACCELEROMETER
-
 #include "settings.h"
 
 #include "imu_handler.h"
 #include "debug.h"
 #include "measure.h"
+#include <cmath>
 
 using namespace mouse_move;
-
-static constexpr const uint8_t GY_FS_SEL = MPU9250_GYRO_FS_2000;
-static constexpr float GY_LSB_DPS = float(1 << 15) / (250 << GY_FS_SEL); /* LSB/dps */
 
 #ifdef ENABLE_PROTOTYPE
     #define GYRO_OFFSET_X 42
@@ -30,26 +25,52 @@ static constexpr float GY_LSB_DPS = float(1 << 15) / (250 << GY_FS_SEL); /* LSB/
     #define ACCEL_OFFSET_Z 9026
 #endif
 
-static constexpr float COMPLE_ALPHA = 0.96;
+static constexpr const uint8_t GYRO_FS_SEL = MPU9250_GYRO_FS_2000;
+static constexpr const float GYRO_LSB_DPS = float(1 << 15) / (250 << GYRO_FS_SEL); /* LSB/dps */
+static constexpr const uint8_t ACCEL_FS_SEL = MPU9250_ACCEL_FS_2;
+static constexpr const float ACCEL_LSB_G = float(1 << 15) / (2 << ACCEL_FS_SEL); /* LSB/g */
 
-static constexpr const float MOUSE_SPEED_IMU_X = 16;
-static constexpr const float MOUSE_SPEED_IMU_Y = 16;
+static constexpr const float COMPLE_ALPHA = 0.98;
+
+static constexpr const float MOUSE_SPEED_IMU_X = degrees(16);
+static constexpr const float MOUSE_SPEED_IMU_Y = degrees(16);
 
 static constexpr const size_t ONLY_GYRO_FIFO_PACKET_SIZE = 4;
 static constexpr const size_t GYRO_ACCEL_FIFO_PACKET_SIZE = 12;
 
-#ifdef IMU_USE_ACCELEROMETER
-    static constexpr size_t FIFO_PACKET_SIZE = GYRO_ACCEL_FIFO_PACKET_SIZE;
-#else /* IMU_USE_ACCELEROMETER */
-    static constexpr size_t FIFO_PACKET_SIZE = ONLY_GYRO_FIFO_PACKET_SIZE;
-#endif /* IMU_USE_ACCELEROMETER */
+static constexpr const size_t FIFO_PACKET_SIZE = GYRO_ACCEL_FIFO_PACKET_SIZE;
 
 #define IMU_GYRO_DISCARD_THRESHOLD  gyro_dps2raw(1)
 
+template <typename T, typename U>
+auto modular(T x, U y) -> decltype(std::fmod(x, y) + y) {
+    auto tmp = std::fmod(x, y);
+    return tmp < 0 ? tmp + y : tmp;
+}
+
+template <typename T, typename U>
+auto modular_diff(T b, T a, U m) -> decltype(b - a) {
+    if (b >= a) {
+        auto tmp1 = b - a;
+        auto tmp2 = tmp1 - m;
+        return tmp1 < abs(tmp2) ? tmp1 : tmp2;
+    }
+    auto tmp1 = b - a;
+    auto tmp2 = m + tmp1;
+    return tmp1 >= -abs(tmp2) ? tmp1 : tmp2;
+}
+
+static inline
+float complementary_combine_angle(float a, float b, float alpha) {
+    // return modular_diff(b, a, 360) * alpha + a;
+    return b - modular_diff(b, a, 360) * alpha;
+}
+
+/* gyro */
 static constexpr inline
-float gyro_raw2dps(int16_t raw) { return raw / GY_LSB_DPS; }
+float gyro_raw2dps(int16_t raw) { return raw / GYRO_LSB_DPS; }
 static constexpr inline
-int16_t gyro_dps2raw(float dps) { return dps * GY_LSB_DPS; }
+int16_t gyro_dps2raw(float dps) { return dps * GYRO_LSB_DPS; }
 static constexpr inline
 float gyro_raw2degree(int16_t raw, unsigned long us) {
     return gyro_raw2dps(raw) * us / 1e6;
@@ -58,14 +79,23 @@ static constexpr inline
 float gyro_raw2radian(int16_t raw, uint32_t us) {
     return radians(gyro_raw2degree(raw, us));
 }
+
+/* accel */
+static constexpr inline
+float accel_raw2g(int16_t a) { return a / ACCEL_LSB_G; }
 static constexpr inline
 float accel_raw2roll(int16_t ax, int16_t ay, int16_t az) {
     return atan2(ay, sqrt(sq(ax) + sq(az)));
 }
 static inline
 float accel_raw2roll2(int16_t ax, int16_t ay, int16_t az) {
-    auto tmp = accel_raw2roll(ax, ay, az);
-    return az >= 0 ? tmp : PI - tmp;
+    auto d = sqrt(sq(ax) + sq(az));
+    return atan2(ay, az < 0 ? -d : d);
+}
+static inline
+float accel_raw2roll3(int16_t ax, int16_t ay, int16_t az) {
+    auto tmp = accel_raw2roll2(ax, ay, az);
+    return tmp + (tmp < 0 ? TWO_PI : 0); // mod
 }
 static inline
 float accel_raw2pitch(int16_t ax, int16_t ay, int16_t az) {
@@ -73,62 +103,34 @@ float accel_raw2pitch(int16_t ax, int16_t ay, int16_t az) {
 }
 static inline
 float accel_raw2pitch2(int16_t ax, int16_t ay, int16_t az) {
-    auto tmp = accel_raw2pitch(ax, ay, az);
-    return az >= 0 ? tmp : PI - tmp;
+    auto d = sqrt(sq(ay) + sq(az));
+    return atan2(ax, az < 0 ? -d : d);
+}
+static inline
+float accel_raw2pitch3(int16_t ax, int16_t ay, int16_t az) {
+    auto tmp = accel_raw2pitch2(ax, ay, az);
+    return tmp + (tmp < 0 ? TWO_PI : 0); // mod
 }
 
 static inline
-void IMU_getMotion6FIFO(MPU9250& mpu, int16_t* ax, int16_t* ay, int16_t* az, int16_t* gx, int16_t* gy, int16_t* gz) {
-    uint8_t buffer[GYRO_ACCEL_FIFO_PACKET_SIZE];
-    mpu.getFIFOBytes(buffer, sizeof(buffer));
-
-    *ax = (((int16_t)buffer[0]) << 8) | buffer[1];
-    *ay = (((int16_t)buffer[2]) << 8) | buffer[3];
-    *az = (((int16_t)buffer[4]) << 8) | buffer[5];
-    *gx = (((int16_t)buffer[6]) << 8) | buffer[7];
-    *gy = (((int16_t)buffer[8]) << 8) | buffer[9];
-    *gz = (((int16_t)buffer[10]) << 8) | buffer[11];
+void IMU_getAcceleration(MPU9250& mpu, int16_t* ax, int16_t* ay, int16_t* az) {
+#ifdef ENABLE_PROTOTYPE
+    mpu.getAcceleration(ax, ay, az);
+    *ax = -*ax;
+#else
+    mpu.getAcceleration(ax, az, ay);
+#endif
 }
 
 static inline
 void IMU_getMotion6(MPU9250& mpu, int16_t* ax, int16_t* ay, int16_t* az, int16_t* gx, int16_t* gy, int16_t* gz) {
-#ifdef IMU_FIFO_ENABLE
-    #ifdef ENABLE_PROTOTYPE
-    IMU_getMotion6FIFO(mpu, ax, ay, az, gx, gy, gz);
-    #else
-    IMU_getMotion6FIFO(mpu, ax, az, ay, gx, gz, gy);
-    #endif
-#else /* IMU_FIFO_ENABLE */
-    #ifdef ENABLE_PROTOTYPE
+#ifdef ENABLE_PROTOTYPE
     mpu.getMotion6(ax, ay, az, gx, gy, gz);
-    #else
-    mpu.getMotion6(ax, az, ay, gx, gz, gy);
-    #endif
-#endif /* IMU_FIFO_ENABLE */
-    #ifndef ENABLE_PROTOTYPE
     *ax = -*ax;
     *gx = -*gx;
-    #endif
-}
-
-static inline
-void IMU_getGyroYZFIFO(MPU9250& mpu, int16_t* gy, int16_t* gz) {
-    uint8_t data[ONLY_GYRO_FIFO_PACKET_SIZE];
-
-    mpu.getFIFOBytes(data, sizeof(data));
-
-    *gy = ((int16_t)data[0] << 8) | data[1];
-    *gz = ((int16_t)data[2] << 8) | data[3];
-}
-
-static inline
-void IMU_getGyroYZ(MPU9250& mpu, int16_t* gy, int16_t* gz) {
-#ifdef IMU_FIFO_ENABLE
-    IMU_getGyroYZFIFO(mpu, gy, gz);
-#else /* IMU_FIFO_ENABLE */
-    int16_t gx;
-    mpu.getRotation(&gx, gy, gz);
-#endif /* IMU_FIFO_ENABLE */ 
+#else
+    mpu.getMotion6(ax, az, ay, gx, gz, gy);
+#endif
 }
 
 void IMUHandler::begin() {
@@ -143,18 +145,14 @@ void IMUHandler::begin() {
     mpu.initialize();
 
     /* GYRO INIT */ {
-        mpu.setFullScaleGyroRange(GY_FS_SEL);
+        mpu.setFullScaleGyroRange(GYRO_FS_SEL);
         mpu.setXGyroOffsetUser(GYRO_OFFSET_X);
         mpu.setYGyroOffsetUser(GYRO_OFFSET_Y);
         mpu.setZGyroOffsetUser(GYRO_OFFSET_Z);
     }
 
     /* ACCEL INIT */ {
-#ifndef IMU_USE_ACCELEROMETER
-        mpu.setStandbyXAccelEnabled(true);
-        mpu.setStandbyYAccelEnabled(true);
-        mpu.setStandbyZAccelEnabled(true);
-#endif /* IMU_USE_ACCELEROMETER */
+        mpu.setFullScaleAccelRange(ACCEL_FS_SEL);
         mpu.setXAccelOffset(ACCEL_OFFSET_X);
         mpu.setYAccelOffset(ACCEL_OFFSET_Y);
         mpu.setZAccelOffset(ACCEL_OFFSET_Z);
@@ -173,14 +171,13 @@ void IMUHandler::begin() {
 
     mpu.setYGyroFIFOEnabled(true);
     mpu.setZGyroFIFOEnabled(true);
-#ifdef IMU_USE_ACCELEROMETER
     mpu.setXGyroFIFOEnabled(true);
     mpu.setAccelFIFOEnabled(true);
-#endif /* IMU_USE_ACCELEROMETER */
     mpu.resetFIFO();
 #endif /* IMU_FIFO_ENABLE*/
     }
 
+    reset();
 }
 
 bool IMUHandler::available() const {
@@ -197,14 +194,27 @@ bool IMUHandler::available() const {
 #endif /* IMU_FIFO_ENABLE */
 }
 
+void IMUHandler::reset() {
+    int16_t ax, ay, az;
+    IMU_getAcceleration(mpu, &ax, &ay, &az);
+
+    prev_roll = accel_raw2roll3(az, ay, az);
+    prev_pitch = accel_raw2pitch3(az, ay, az);
+
+    prev_ax = ax;
+    prev_ay = ay;
+    prev_az = az;
+}
+
 static inline
 int16_t _discard_gyro_value(int16_t value) {
     return abs(value) < IMU_GYRO_DISCARD_THRESHOLD ? 0 : value;
 }
 
+#if 1 /* basic */
 Move IMUHandler::operator()(unsigned long interval_us) {
-    static Measure<unsigned long long> measure(10000);
-    measure.appendValue(interval_us);
+    // static Measure<unsigned long long> measure(10000);
+    // measure.appendValue(interval_us);
 
     int16_t ax, ay, az, gx, gy, gz;
     IMU_getMotion6(mpu, &ax, &ay, &az, &gx, &gy, &gz);
@@ -213,9 +223,9 @@ Move IMUHandler::operator()(unsigned long interval_us) {
     gy = _discard_gyro_value(gy);
     gz = _discard_gyro_value(gz);
 
-    float dx = gyro_raw2degree(gx, interval_us);
-    float dy = gyro_raw2degree(gy, interval_us);
-    float dz = gyro_raw2degree(gz, interval_us);
+    float dx = gyro_raw2radian(gx, interval_us);
+    float dy = gyro_raw2radian(gy, interval_us);
+    float dz = gyro_raw2radian(gz, interval_us);
 
     int32_t ax2 = sq(ax), ay2 = sq(ay), az2 = sq(az);
     double n = sqrt(ax2 + ay2 + az2);
@@ -239,25 +249,128 @@ Move IMUHandler::operator()(unsigned long interval_us) {
         .y = pitch * MOUSE_SPEED_IMU_Y,
     };
 }
+#endif
 
-#if 0 /* only gyro */
-#ifdef IMU_USE_ACCELEROMETER 
-    #error Accelerometer should be disabled. 
-#endif /* IMU_USE_ACCELEROMETER */
-
+#if 0
 Move IMUHandler::operator()(unsigned long interval_us) {
-    int16_t gy, gz;
+    static MeasureTime measure(10000);
+    int16_t ax, ay, az, gx, gy, gz;
+    IMU_getMotion6(mpu, &ax, &ay, &az, &gx, &gy, &gz);
 
-    // measure::begin(); // 426
-    IMU_getGyroYZ(mpu, &gy, &gz);
-    // measure::end();
+    measure.measureStart();
+    gx = _discard_gyro_value(gx);
+    gy = _discard_gyro_value(gy);
+    gz = _discard_gyro_value(gz);
 
-    float yaw   = gyro_raw2degree(gz, interval_us);
-    float pitch = gyro_raw2degree(gy, interval_us);
+    float dx = gyro_raw2radian(gx, interval_us);
+    float dy = gyro_raw2radian(gy, interval_us);
+    float dz = gyro_raw2radian(gz, interval_us);
+
+    float apitch = accel_raw2pitch3(ax, ay, az);
+    float aroll  = accel_raw2roll3(ax, ay, az);
+
+    float gpitch = cos(aroll) * dy + sin(-aroll) * dz;
+    float groll = cos(apitch) * dx + sin(-apitch) * dz;
+    // auto gyaw = 
+    // auto sin_roll = sin(prev_roll), sin_pitch = sin(prev_pitch);
+    // auto gyaw = (sin_roll * gy) + (sin_pitch * gx) + (gz / sqrt(1 + sq(sin_pitch) + sq(prev_roll)));
+
+    // prev_roll  = modular(prev_roll + groll, TWO_PI);
+    // prev_pitch  = modular(prev_pitch + gpitch, TWO_PI);
+
+    // Serial.print(degrees(aroll)); Serial.print(' ');
+    // Serial.print(degrees(apitch)); Serial.print(' ');
+    // Serial.print(degrees(prev_roll)); Serial.print(' ');
+    // Serial.print(degrees(prev_pitch)); Serial.print(' ');
+    // Serial.println();
+    measure.measureStop();
+
+    return { 
+        .x = 0 * MOUSE_SPEED_IMU_X,
+        .y = gpitch * MOUSE_SPEED_IMU_Y,
+    };
+}
+#endif
+
+#if 0
+Move IMUHandler::operator()(unsigned long interval_us) {
+    int16_t ax, ay, az, gx, gy, gz;
+    IMU_getMotion6(mpu, &ax, &ay, &az, &gx, &gy, &gz);
+
+    gx = _discard_gyro_value(gx);
+    gy = _discard_gyro_value(gy);
+    gz = _discard_gyro_value(gz);
+
+    float dx = gyro_raw2radian(gx, interval_us);
+    float dy = gyro_raw2radian(gy, interval_us);
+    float dz = gyro_raw2radian(gz, interval_us);
+
+    float apitch = accel_raw2pitch3(ax, ay, az);
+    float aroll  = accel_raw2roll3(ax, ay, az);
+
+    prev_pitch = modular(complementary_combine_angle(prev_pitch, apitch, COMPLE_ALPHA), TWO_PI);
+    prev_roll = modular(complementary_combine_angle(prev_roll, aroll, COMPLE_ALPHA), TWO_PI);
+
+    float gpitch = cos(prev_roll) * dy + sin(-prev_roll) * dz;
+    // float groll = cos(apitch) * dx + sin(-apitch) * dz;
+
+    Serial.print(degrees(prev_roll)); Serial.print(' ');
+    Serial.print(degrees(prev_pitch)); Serial.print(' ');
+    Serial.println();
+
+    return { 
+        .x = 0 * MOUSE_SPEED_IMU_X,
+        .y = gpitch * MOUSE_SPEED_IMU_Y,
+    };
+}
+#endif
+
+#if 0 /* basic */
+Move IMUHandler::operator()(unsigned long interval_us) {
+    // static Measure<unsigned long long> measure(10000);
+    // measure.appendValue(interval_us);
+
+    int16_t ax, ay, az, gx, gy, gz;
+    IMU_getMotion6(mpu, &ax, &ay, &az, &gx, &gy, &gz);
+
+    gx = _discard_gyro_value(gx);
+    gy = _discard_gyro_value(gy);
+    gz = _discard_gyro_value(gz);
+
+    float dx = gyro_raw2radian(gx, interval_us);
+    float dy = gyro_raw2radian(gy, interval_us);
+    float dz = gyro_raw2radian(gz, interval_us);
+
+    ax = prev_ax * COMPLE_ALPHA + ax * (1 - COMPLE_ALPHA);
+    ay = prev_ay * COMPLE_ALPHA + ay * (1 - COMPLE_ALPHA);
+    az = prev_az * COMPLE_ALPHA + az * (1 - COMPLE_ALPHA);
+
+    int32_t ax2 = sq(ax), ay2 = sq(ay), az2 = sq(az);
+    double n = sqrt(ax2 + ay2 + az2);
+    float yaw   = float((ax/n * dx) + (ay/n * dy) + (az/n * dz));
+    
+    // auto apitch = accel_raw2pitch(ax, ay, az);
+    auto roll2 = accel_raw2roll2(ax, ay, az);
+    float pitch = cos(roll2) * dy + sin(-roll2) * dz;
+
+    prev_ax = ax;
+    prev_ay = ay;
+    prev_az = az;
+
+#if 0
+    static Measure<int> measure(1000);
+    // min: 0.000000, mean: 0.000172, max: 0.001863 
+    // measure.appendValue(abs(yaw));
+    // min: 0.000000, mean: 0.137573, max: 0.610352 
+    // measure.appendValue(abs(gyro_raw2dps(gz)));
+    measure.appendValue(abs(gz));
+
+#endif
 
     return { 
         .x = yaw * MOUSE_SPEED_IMU_X,
         .y = pitch * MOUSE_SPEED_IMU_Y,
     };
 }
-#endif /* only gyro*/
+
+#endif

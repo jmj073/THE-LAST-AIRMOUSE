@@ -1,20 +1,31 @@
-#include "keyboard_looper.h"
+#include "looper.h"
 
-#include "pins.h"
 #include "joystick.h"
+#include "measure.h"
 
 using namespace keyboard;
 
-auto InputHandler::operator()(unsigned long interval_us) -> InputData {
-    int x = joystickGetX();
-    int y = joystickGetY();
+static constexpr const float THRESHOLD = 1500;
+
+auto InputHandler::operator()(unsigned long interval) -> InputData {
+    (void)interval;
+
+    auto& joystick = MyJoystick::getInstance();
+    auto x = joystick.getx();
+    auto y = joystick.gety();
+
+#if 1
+    // Serial.printf("%d %d\n", x, y);
+    static Measure<int> measure(1000);
+    measure.appendValue(abs(x));
+#endif
 
     uint8_t key{};
-    key |= x < -1000 ? KEY::KEY_D
-        : (x > 1000 ? KEY::KEY_A : 0);
+    key |= x < -THRESHOLD ? KEY::KEY_D
+        : (x > THRESHOLD ? KEY::KEY_A : 0);
 
-    key |= y < -1000 ? KEY::KEY_W 
-        : (y > 1000 ? KEY::KEY_S : 0);
+    key |= y < -THRESHOLD ? KEY::KEY_W 
+        : (y > THRESHOLD ? KEY::KEY_S : 0);
 
     return InputData(key);
 }

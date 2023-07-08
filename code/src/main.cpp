@@ -9,19 +9,15 @@
 #include "utils.h"
 #include "MyButton.h"
 #include "mouse_move/looper.h"
-#include "keyboard_looper.h"
+#include "keyboard/looper.h"
+#include "joystick.h"
 
 #include "debug.h"
 #include "measure.h"
 
-#ifdef ENABLE_PROTOTYPE
-    #define DEVICE_NAME "prototype"
-#else /* ENABLE_PROTOTYPE */
-    #define DEVICE_NAME "M416D"
-#endif /* ENABLE_PROTOTYPE */
+static inline void battery_level_update();
+static inline void battery_level_update_periodically();
 
-static inline
-void battery_level_refresh_periodically();
 static void handle_left_click(bool released);
 static void handle_right_click(bool released);
 static void handle_joystick_btn(bool released);
@@ -46,13 +42,16 @@ void setup() {
 #endif /* DEBUG*/
     combo.begin();
     mouse_move_looper.getInputHandler().begin();
-
     button_left.set_debounce_time(POLL_MS);
     button_right.set_debounce_time(POLL_MS);
     button_joystick.set_debounce_time(POLL_MS);
     keyboard_looper.getInputHandler().inputEnable();
 
+    yield();
+    MyJoystick::getInstance().begin();
+
     while (!combo.isConnected()) yield();
+    battery_level_update();
 }
 
 void loop() {
@@ -64,12 +63,11 @@ void loop() {
     button_right.loop();
     button_joystick.loop();
 
-    keyboard_looper.loop();
-
     mouse_move_looper.loop();
     mouse_move_looper.getOutputHandler().moveMouse();
+    keyboard_looper.loop();
 
-    battery_level_refresh_periodically();
+    battery_level_update_periodically();
 }
 
 static
@@ -123,18 +121,28 @@ void handle_joystick_btn(bool released) {
             mouse_move_looper.getInputHandler().setInputMode(mouse_move::JOYSTICK);
             mouse_move_looper.reset();
             keyboard_looper.getInputHandler().inputDisable();
+            keyboard_looper.reset();
             break;
     }
 }
 
+/*
+reference:
+https://www.wemos.cc/en/latest/_static/files/sch_d32_v1.0.0.pdf
+https://electronics.stackexchange.com/questions/435837/calculate-battery-percentage-on-lipo-battery
+*/
 static inline
 int get_battery_level() {
-    return 50;
+    auto raw_value = analogRead(_VBAT);
+    auto voltage = raw_value * (6.6 / (1 << 12));
+    auto percentage = 123 - 123 / pow(1 + pow(voltage / 3.7, 80), 0.165);
+    return std::clamp<int>(percentage, 0, 100);
 }
 
 static inline
-void battery_level_refresh() {
-    combo.setBatteryLevel(get_battery_level());
+void battery_level_update() {
+    // combo.setBatteryLevel(get_battery_level());
+    combo.setBatteryLevel(77);
 }
 
 static inline constexpr
@@ -143,12 +151,13 @@ unsigned long min2ms(unsigned long minute) {
 }
 
 static inline
-void battery_level_refresh_periodically() {
+void battery_level_update_periodically() {
     static unsigned long prev_ms;
     auto curr_ms = millis();
 
     if (curr_ms - prev_ms < min2ms(5)) return;
-    battery_level_refresh();
+    prev_ms = curr_ms;
+    battery_level_update();
 }
 
 #endif /* FILE */

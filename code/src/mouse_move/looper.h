@@ -2,7 +2,6 @@
 #define _MOUSE_MOVE_LOOPER_H_
 
 #include <BleCombo.h>
-
 #include <looper.h>
 
 namespace mouse_move {
@@ -11,7 +10,7 @@ namespace mouse_move {
     using MouseMoveLooper = Looper<InputHandler, OutputHandler>;
 
     enum InputMode { IMU, JOYSTICK };
-    struct Move { float x, y; };
+    struct Move { double x, y; };
 
     class HandlerInterface {
     public:

@@ -31,7 +31,7 @@ public: // delete function
     Looper& operator=(Looper&&) = delete;
 
 public:
-    Looper(InputHandler iHandler, OutputHandler oHandler)
+    Looper(InputHandler iHandler = InputHandler(), OutputHandler oHandler = OutputHandler())
         : iHandler{ std::move(iHandler) }, oHandler{ std::move(oHandler) }
     { }
 
@@ -62,13 +62,11 @@ private:
 template <typename IH, typename OH>
 void Looper<IH, OH>::reset() {
     isFirst = true;
-    iHandler.reset();
     oHandler.reset();
 }
 
 template <typename IH, typename OH>
 void Looper<IH, OH>::loop() {
-    // if (!iHandler.available()) return;
     if (!iHandler.available()) {
         isFirst = true;
         return;
@@ -76,6 +74,7 @@ void Looper<IH, OH>::loop() {
     
     if (isFirst) {
         isFirst = false;
+        iHandler.reset();
         prev_us = micros();
         return;
     }

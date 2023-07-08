@@ -7,11 +7,24 @@
 namespace mouse_move {
     class IMUHandler: public HandlerInterface {
     public:
-        bool available() const override;
-        Move operator()(unsigned long interval_us) override;
+        using InputData = Move;
+
+    public:
         void begin();
+
+    public: // HandlerInterface trait for InputHandler
+        bool available() const override;
+        void reset() override;
+        Move operator()(unsigned long interval_us) override;
+
     private:
         MPU9250 mpu;
+        float prev_roll;
+        float prev_pitch;
+
+        int16_t prev_ax;
+        int16_t prev_ay;
+        int16_t prev_az;
     };
 }
 
