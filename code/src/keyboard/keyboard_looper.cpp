@@ -5,7 +5,7 @@
 
 using namespace keyboard;
 
-static constexpr const float THRESHOLD = 1500;
+static constexpr const long THRESHOLD = 1500;
 
 auto InputHandler::operator()(unsigned long interval) -> InputData {
     (void)interval;
@@ -14,7 +14,7 @@ auto InputHandler::operator()(unsigned long interval) -> InputData {
     auto x = joystick.getx();
     auto y = joystick.gety();
 
-#if 1
+#if 0
     // Serial.printf("%d %d\n", x, y);
     static Measure<int> measure(1000);
     measure.appendValue(abs(x));

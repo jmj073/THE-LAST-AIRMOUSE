@@ -1,7 +1,7 @@
 #include "looper.h"
 
-#include "imu_handler.h"
 #include "joystick_handler.h"
+#include "imu/imu_handler.h"
 
 using namespace mouse_move;
 

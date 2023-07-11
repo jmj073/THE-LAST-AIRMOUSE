@@ -52,6 +52,7 @@ void setup() {
 
     while (!combo.isConnected()) yield();
     battery_level_update();
+    delay(1000);
 }
 
 void loop() {
@@ -63,9 +64,9 @@ void loop() {
     button_right.loop();
     button_joystick.loop();
 
+    keyboard_looper.loop();
     mouse_move_looper.loop();
     mouse_move_looper.getOutputHandler().moveMouse();
-    keyboard_looper.loop();
 
     battery_level_update_periodically();
 }
@@ -82,10 +83,11 @@ void handle_left_click(bool released) {
 
 static
 void handle_right_click(bool released) {
-    if (released) {
+    if (released) return;
+
+    if (combo.isPressed(MOUSE_RIGHT)) {
         combo.mouseRelease(MOUSE_RIGHT);
     } else {
-        DEBUG_PRINTLN("right pressed!");
         combo.mousePress(MOUSE_RIGHT);
     }
 }
@@ -141,8 +143,8 @@ int get_battery_level() {
 
 static inline
 void battery_level_update() {
-    // combo.setBatteryLevel(get_battery_level());
-    combo.setBatteryLevel(77);
+    combo.setBatteryLevel(get_battery_level());
+    // combo.setBatteryLevel(77);
 }
 
 static inline constexpr

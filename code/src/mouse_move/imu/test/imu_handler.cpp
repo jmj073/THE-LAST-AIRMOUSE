@@ -23,7 +23,8 @@ void loop() {
 }
 
 void TestOutputHandler::operator()(const InputData& input) {
-
+    Serial.print(input.x); Serial.print(' ');
+    Serial.print(input.y); Serial.println();
 }
 
 #endif

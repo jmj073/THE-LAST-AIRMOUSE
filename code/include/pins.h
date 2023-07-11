@@ -7,12 +7,12 @@
 // #define SCL         22
 
 /* button */
-#define PIN_LEFT_CLICK  32
-#define PIN_RIGHT_CLICK 33
+#define PIN_LEFT_CLICK  26
+#define PIN_RIGHT_CLICK 25
 
 /* joystick */
-#define PIN_JOYSTICK_X      A18 // 25
-#define PIN_JOYSTICK_Y      A19 // 26
+#define PIN_JOYSTICK_X      A4 // 32
+#define PIN_JOYSTICK_Y      A5 // 33
 #define PIN_JOYSTICK_BTN    12
 
 #endif /* _PINS_H_ */

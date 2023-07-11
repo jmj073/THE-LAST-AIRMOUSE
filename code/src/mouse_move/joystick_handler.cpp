@@ -21,7 +21,7 @@ Move JoystickHandler::operator()(unsigned long interval_us) {
     auto x = _discard_joystick_value(joystick.getx());
     auto y = _discard_joystick_value(joystick.gety());
 
-#if 1
+#if 0
     // 이상하게 이거 빼면 joystick값 이상해지니까 빼면 안됨
     static Measure<int> measure(1000);
     measure.appendValue(abs(x));

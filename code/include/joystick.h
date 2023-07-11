@@ -30,6 +30,8 @@ private:
 class MyJoystick {
 private:
     static constexpr const size_t SAMPLING_COUNT = 1000;
+    static constexpr const size_t DLPF_COUNT = 1000;
+    static constexpr const long DLPV_VALUE = 500;
 private:
     MyJoystick()
         : handle(PIN_JOYSTICK_X, PIN_JOYSTICK_Y)
@@ -53,6 +55,14 @@ public:
         return instance;
     }
 
+//     long getx() {
+// #ifdef ENABLE_PROTOTYPE
+//         auto v = handle.gety();
+// #else /* ENABLE_PROTOTYPE */
+//         auto v = handle.getx();
+// #endif /* ENABLE_PROTOTYPE */
+//     }
+
 #ifdef ENABLE_PROTOTYPE
     long getx() { return handle.gety(); }
     long gety() { return handle.getx(); }
@@ -63,6 +73,8 @@ public:
 
 private:
     Joystick handle;
+    long prevx = 0;
+    long prevy = 0;
 };
 
 #endif /* _JOYSTICK_H_ */
